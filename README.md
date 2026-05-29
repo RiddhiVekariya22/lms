@@ -1,7 +1,5 @@
-<div align="center" markdown="1">
+<div align="left" markdown="1">
 
-<img src=".github/lms-logo.png" alt="Frappe Learning logo" width="80" height="80"/>
-<h1>LMS</h1>
 
 
 ### Key Features
@@ -189,17 +187,18 @@ You will be prompted for the MariaDB root password set in step 4, and to set an 
 #### 8. Get and install the LMS app
 
 ```bash
-bench get-app https://github.com/your-org/lms
+bench get-app [https://github.com/your-org/lms](https://github.com/quantoneural-ai/frappe)
 bench --site lms.localhost install-app lms
 ```
 
 > Replace `https://github.com/your-org/lms` with the actual repository URL if it differs.
 
+can be skipped - this is just for refactored color theme payment pages
 #### 9. Get and install the Payments app
 
 ```bash
-bench get-app payments
-bench --site lms.localhost install-app payments
+bench get-app [github branch link for payments app]
+bench --site lms.localhost install-app [app-name]
 ```
 
 #### 10. Map the site to localhost and start the server
@@ -340,11 +339,4 @@ Install the version with patched Qt from the [wkhtmltopdf releases page](https:/
 ---
 
 <br>
-<div align="center" style="padding-top: 0.75rem;">
-	<a href="https://frappe.io" target="_blank">
-		<picture>
-			<source media="(prefers-color-scheme: dark)" srcset="https://frappe.io/files/Frappe-white.png">
-			<img src="https://frappe.io/files/Frappe-black.png" alt="Frappe Technologies" height="28"/>
-		</picture>
-	</a>
-</div>
+
