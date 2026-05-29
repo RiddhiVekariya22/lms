@@ -118,6 +118,7 @@ sudo apt install -y \
   wkhtmltopdf \
   xvfb libfontconfig
 ```
+sudo apt install git redis-server libmariadb-dev mariadb-server mariadb-client pkg-config
 
 Install yarn globally:
 
@@ -127,8 +128,12 @@ sudo npm install -g yarn
 
 #### 4. Secure MariaDB
 
+During installation you may be prompted to set the MariaDB root password automatically. If that happened, skip the command below.
+
+If you were **not** prompted during install, run:
+
 ```bash
-sudo mysql_secure_installation
+sudo mariadb-secure-installation
 ```
 
 When prompted:
@@ -184,21 +189,20 @@ bench new-site lms.localhost
 
 You will be prompted for the MariaDB root password set in step 4, and to set an Administrator password for the site.
 
-#### 8. Get and install the LMS app
+#### 8. Get and install the Payments app
+
+LMS declares `payments` as a required app — when you run `bench get-app lms`, bench will auto-fetch the official `frappe/payments` unless payments is already present. To use our fork instead, **fetch payments first**:
 
 ```bash
-bench get-app [https://github.com/your-org/lms](https://github.com/quantoneural-ai/frappe)
-bench --site lms.localhost install-app lms
+bench get-app https://github.com/quantoneural-ai/payments
+bench --site lms.localhost install-app payments
 ```
 
-> Replace `https://github.com/your-org/lms` with the actual repository URL if it differs.
-
-can be skipped - this is just for refactored color theme payment pages
-#### 9. Get and install the Payments app
+#### 9. Get and install the LMS app
 
 ```bash
-bench get-app [github branch link for payments app]
-bench --site lms.localhost install-app [app-name]
+bench get-app https://github.com/quantoneural-ai/frappe
+bench --site lms.localhost install-app lms
 ```
 
 #### 10. Map the site to localhost and start the server
@@ -238,8 +242,12 @@ sudo npm install -g yarn
 
 #### 2. Secure and configure MariaDB
 
+During installation you may be prompted to set the MariaDB root password automatically. If that happened, skip the command below.
+
+If you were **not** prompted during install, run:
+
 ```bash
-sudo mysql_secure_installation
+sudo mariadb-secure-installation
 ```
 
 Edit the MariaDB server config:
@@ -289,18 +297,20 @@ bench new-site lms.localhost
 
 Enter your MariaDB root password when prompted, then set an Administrator password for the site.
 
-#### 6. Get and install the LMS app
+#### 6. Get and install the Payments app
+
+LMS declares `payments` as a required app — when you run `bench get-app lms`, bench will auto-fetch the official `frappe/payments` unless payments is already present. To use our fork instead, **fetch payments first**:
 
 ```bash
-bench get-app https://github.com/your-org/lms
-bench --site lms.localhost install-app lms
+bench get-app https://github.com/quantoneural-ai/payments
+bench --site lms.localhost install-app payments
 ```
 
-#### 7. Get and install the Payments app
+#### 7. Get and install the LMS app
 
 ```bash
-bench get-app payments
-bench --site lms.localhost install-app payments
+bench get-app https://github.com/quantoneural-ai/frappe
+bench --site lms.localhost install-app lms
 ```
 
 #### 8. Start the development server
@@ -314,13 +324,61 @@ Open [http://lms.localhost:8000](http://lms.localhost:8000) in your browser.
 
 ---
 
+## Deploying to Frappe Cloud
+
+This project uses forked versions of both the LMS and Payments apps. Frappe Cloud needs explicit access to those private/forked GitHub repos via deploy keys.
+
+### Prerequisites
+
+- A [Frappe Cloud](https://frappecloud.com) account
+- Both repos (`quantoneural-ai/payments` and `quantoneural-ai/frappe`) hosted on GitHub
+- Your GitHub account connected to Frappe Cloud
+
+### Step 1 — Add app sources
+
+In the Frappe Cloud dashboard go to **Bench → Apps → Add App**. Add each forked repo as an app source:
+
+1. Paste the GitHub repo URL and select the branch (`clean-deploy`)
+2. Frappe Cloud will generate a **deploy key** for the repo
+3. Copy that key and add it to the GitHub repo under **Settings → Deploy keys**
+
+Repeat for both repos — **payments first**, then **lms**.
+
+### Step 2 — Create a bench
+
+Go to **Benches → New Bench** and configure:
+
+- Frappe version: `version-15`
+- Apps: add `payments` first, then `lms` (order matters — see [How Bench, Sites, and Apps Work](#structure))
+
+### Step 3 — Deploy the bench
+
+Click **Deploy**. Frappe Cloud will build the bench with your apps. This takes a few minutes.
+
+### Step 4 — Create a site
+
+Once the bench is deployed, go to **Sites → New Site**:
+
+- Select the bench you just deployed
+- Set a site name (e.g. `yoursite.frappe.cloud`)
+- Under apps to install, select `payments` then `lms`
+- Set an Administrator password
+
+### Step 5 — Done
+
+The site will be live at `yoursite.frappe.cloud` once provisioning completes (~5 minutes).
+
+> **Note:** The deploy key step is the most commonly missed part when using forked or private repos. If the bench deploy fails with a git clone error, check that both repos have their deploy keys added correctly.
+
+---
+
 ## Troubleshooting
 
 **`bench` command not found**  
 Add `~/.local/bin` to PATH (see the PATH export step above).
 
 **MariaDB access denied**  
-Make sure you ran `mysql_secure_installation` and are supplying the correct root password.
+Make sure you ran `mariadb-secure-installation` (if not prompted during install) and are supplying the correct root password.
 
 **Node/yarn version mismatch**  
 Use [nvm](https://github.com/nvm-sh/nvm) to manage Node versions: `nvm install 18 && nvm use 18`.
