@@ -1,172 +1,344 @@
 <div align="center" markdown="1">
 
 <img src=".github/lms-logo.png" alt="Frappe Learning logo" width="80" height="80"/>
-<h1>Frappe Learning</h1>
+<h1>LMS</h1>
 
-**Easy to use, open source, Learning Management System**
-
-![Tests](https://img.shields.io/endpoint?url=https://dashboard.cypress.io/badge/simple/vandxn/main&style=flat&logo=cypress)
-
-</div>
-
-
-<div align="center">
-	<img src=".github/hero.png?v=5" alt="Hero Image" width="72%" />
-</div>
-<br />
-<div align="center">
-	<a href="https://frappe.io/learning">Website</a>
-	-
-	<a href="https://docs.frappe.io/learning">Documentation</a>
-</div>
-
-## Frappe Learning
-Frappe Learning is an easy-to-use learning system that helps you bring structure to your content.
-
-### Motivation
-In 2021, we were looking for a Learning Management System to launch [Mon.School](https://mon.school) for FOSS United. We checked out Moodle, but it didn’t feel right. The forms were unnecessarily lengthy and the UI was confusing. It shouldn't be this hard to create a course right? So I started making a learning system for Mon.School which soon became a product in itself. The aim is to have a simple platform that anyone can use to launch a course of their own and make knowledge sharing easier.
 
 ### Key Features
 
-- **Structured Learning**: Design a course with a 3-level hierarchy, where your courses have chapters and you can group your lessons within these chapters. This ensures that the context of the lesson is set by the chapter.
+- **Structured Learning**: Design a course with a 3-level hierarchy — courses, chapters, and lessons.
+- **Quizzes and Assignments**: Single-choice, multiple-choice, or open-ended questions; PDF/document assignment submissions.
+- **Certifications**: Grant certificates on course or batch completion using the built-in or a custom template.
 
-- **Live Classes**: Group learners into batches based on courses and duration. You can then create Zoom live class for these batches right from the app. Learners get to see the list of live classes they have to take as a part of this batch.
+---
 
-- **Quizzes and Assignments**: Create quizzes where questions can have single-choice, multiple-choice options, or can be open ended. Instructors can also add assignments which learners can submit as PDF's or Documents.
+## Structure
 
-- **Getting Certified**: Once a learner has completed the course or batch, you can grant them a certificate. The app provides an inbuilt certificate template. You can use this or else create a template of your own and use that instead.
+Understanding the relationship between these three concepts makes the setup steps much easier to follow.
 
-<details>
-<summary>View Screenshots</summary>
+### Bench
 
+A **bench** is a self-contained directory that holds everything Frappe needs to run: the framework, your apps, a Python virtual environment, config files, and the scripts that manage processes. You create one with `bench init`, and from that point on every `bench` command you run must be executed from inside that directory.
 
-![Batch](.github/batch.png)
-<div align="center">
-	<sub>
-		Create batches to group your learners
-	</sub>
-</div>
-<br>
-
-
-![Quiz](.github/quiz.png)
-<div align="center">
-	<sub>
-		Evaluate their knowledge by quizzes
-	</sub>
-</div>
-<br>
-
-
-![Cerficicate](.github/certificate.png)
-<div align="center">
-	<sub>
-		Autenticate their work with certification
-	</sub>
-</div>
-</details>
-
-
-### Under the Hood
-
-- [**Frappe Framework**](https://github.com/frappe/frappe): A full-stack web application framework.
-
-- [**Frappe UI**](https://github.com/frappe/frappe-ui): A Vue-based UI library, to provide a modern user interface.
-
-## Production Setup
-
-### Managed Hosting
-
-You can try [Frappe Cloud](https://frappecloud.com), a simple, user-friendly and sophisticated [open-source](https://github.com/frappe/press) platform to host Frappe applications with peace of mind.
-
-It takes care of installation, setup, upgrades, monitoring, maintenance and support of your Frappe deployments. It is a fully featured developer platform with an ability to manage and control multiple Frappe deployments.
-
-<div>
-	<a href="https://frappecloud.com/lms/signup" target="_blank">
-		<picture>
-			<source media="(prefers-color-scheme: dark)" srcset="https://frappe.io/files/try-on-fc-white.png">
-			<img src="https://frappe.io/files/try-on-fc-black.png" alt="Try on Frappe Cloud" height="28" />
-		</picture>
-	</a>
-</div>
-
-### Self Hosting
-
-Follow these steps to set up Frappe Learning in production:
-
-**Step 1**: Download the easy install script
-
-```bash
-wget https://frappe.io/easy-install.py
+```
+frappe-bench/          ← the bench root
+├── apps/              ← all installed apps live here
+│   ├── frappe/        ← the core framework (always present)
+│   ├── lms/           ← the LMS app
+│   └── payments/      ← the Payments app
+├── sites/             ← one sub-folder per site
+│   └── lms.localhost/
+├── env/               ← Python virtualenv
+└── Procfile           ← defines the processes bench start launches
 ```
 
-**Step 2**: Run the deployment command
+### Apps
+
+An **app** is a Python/Vue package that adds features to Frappe. Apps live in `apps/` and are fetched with `bench get-app`. Fetching an app only downloads it — it is not active anywhere yet.
+
+### Sites
+
+A **site** is an independent Frappe installation with its own database, file storage, and settings. A single bench can host multiple sites. You create one with `bench new-site`.
+
+### Putting it together
+
+Installing an app **onto a site** is the step that activates it:
 
 ```bash
-python3 ./easy-install.py deploy \
-    --project=learning_prod_setup \
-    --email=your_email.example.com \
-    --image=ghcr.io/frappe/lms \
-    --version=stable \
-    --app=lms \
-    --sitename subdomain.domain.tld
+bench --site <sitename> install-app <appname>
 ```
 
-Replace the following parameters with your values:
-- `your_email.example.com`: Your email address
-- `subdomain.domain.tld`: Your domain name where Learning will be hosted
+This runs the app's database migrations against that site's database and registers the app there. The same app can be installed on some sites and not others within the same bench — each site is fully isolated.
 
-The script will set up a production-ready instance of Frappe Learning with all the necessary configurations in about 5 minutes.
+So the full flow is always:
 
-**Note:** To avoid a `404 Page Not Found` error:
-- If hosting on a **public server**, make sure your DNS **A record** points to your server's IP.
-- If hosting **locally**, map your domain to `127.0.0.1` in your `/etc/hosts` file:
+1. `bench init` — create the bench
+2. `bench new-site` — create a site (and its database)
+3. `bench get-app` — download an app into the bench
+4. `bench --site <name> install-app` — activate the app on the site
+5. `bench start` — boot all processes (web server, workers, scheduler)
+
+---
 
 ## Development Setup
 
-### Docker
+### Prerequisites
 
-You need Docker, docker-compose and git setup on your machine. Refer [Docker documentation](https://docs.docker.com/). After that, follow below steps:
+| Tool | Minimum Version |
+|------|----------------|
+| Python | 3.10+ |
+| Node.js | 18+ |
+| MariaDB | 10.6+ |
+| Redis | 6+ |
+| wkhtmltopdf | 0.12.6 (with patched Qt) |
+| yarn | 1.12+ |
 
-**Step 1**: Setup folder and download the required files
+---
 
-    mkdir frappe-learning
-    cd frappe-learning
+### Windows (via WSL 2)
 
-    # Download the docker-compose file
-    wget -O docker-compose.yml https://raw.githubusercontent.com/frappe/lms/develop/docker/docker-compose.yml
+Frappe bench does not run natively on Windows. The recommended approach is to use **WSL 2** (Windows Subsystem for Linux) with Ubuntu.
 
-    # Download the setup script
-    wget -O init.sh https://raw.githubusercontent.com/frappe/lms/develop/docker/init.sh
+#### 1. Enable WSL 2
 
-**Step 2**: Run the container and daemonize it
+Open **PowerShell as Administrator** and run:
 
-    docker compose up -d
+```powershell
+wsl --install
+```
 
-**Step 3**: The site [http://lms.localhost:8000/lms](http://lms.localhost:8000/lms) should now be available. The default credentials are:
-- Username: Administrator
-- Password: admin
+Restart your machine when prompted. This installs WSL 2 with Ubuntu by default.
 
-### Local
+If WSL is already installed but you need Ubuntu:
 
-To setup the repository locally follow the steps mentioned below:
+```powershell
+wsl --install -d Ubuntu
+```
 
-1. Install bench and setup a `frappe-bench` directory by following the [Installation Steps](https://frappeframework.com/docs/user/en/installation)
-1. Start the server by running `bench start`
-1. In a separate terminal window, create a new site by running `bench new-site learning.test`
-1. Map your site to localhost with the command `bench --site learning.test add-to-hosts`
-1. Get the Learning app. Run `bench get-app https://github.com/frappe/lms`
-1. Run `bench --site learning.test install-app lms`.
-1. Now open the URL `http://learning.test:8000/lms` in your browser, you should see the app running
+Set WSL 2 as the default version:
 
-## Learn and connect
+```powershell
+wsl --set-default-version 2
+```
 
-- [Telegram Public Group](https://t.me/frappelms)
-- [Discuss Forum](https://discuss.frappe.io/c/lms/70)
-- [Documentation](https://docs.frappe.io/learning)
-- [YouTube](https://www.youtube.com/channel/UCn3bV5kx77HsVwtnlCeEi_A)
+#### 2. Open Ubuntu and update packages
 
-<br>
+```bash
+sudo apt update && sudo apt upgrade -y
+```
+
+#### 3. Install system dependencies
+
+```bash
+sudo apt install -y \
+  python3-dev python3-pip python3-venv \
+  mariadb-server mariadb-client \
+  redis-server \
+  nodejs npm \
+  git curl \
+  libffi-dev libssl-dev \
+  wkhtmltopdf \
+  xvfb libfontconfig
+```
+
+Install yarn globally:
+
+```bash
+sudo npm install -g yarn
+```
+
+#### 4. Secure MariaDB
+
+```bash
+sudo mysql_secure_installation
+```
+
+When prompted:
+- Set a root password (remember it — you'll need it for bench).
+- Answer **Y** to all remaining prompts.
+
+Then configure MariaDB for Frappe by editing the config:
+
+```bash
+sudo nano /etc/mysql/mariadb.conf.d/50-server.cnf
+```
+
+Add or update the `[mysqld]` section:
+
+```ini
+[mysqld]
+character-set-client-handshake = FALSE
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
+```
+
+Restart MariaDB:
+
+```bash
+sudo service mariadb restart
+```
+
+#### 5. Install frappe-bench
+
+```bash
+pip3 install frappe-bench
+```
+
+If the `bench` command is not found after install, add the local bin to your PATH:
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+#### 6. Initialise a bench
+
+```bash
+bench init --frappe-branch version-15 frappe-bench
+cd frappe-bench
+```
+
+#### 7. Create a new site
+
+```bash
+bench new-site lms.localhost
+```
+
+You will be prompted for the MariaDB root password set in step 4, and to set an Administrator password for the site.
+
+#### 8. Get and install the LMS app
+
+```bash
+bench get-app https://github.com/your-org/lms
+bench --site lms.localhost install-app lms
+```
+
+> Replace `https://github.com/your-org/lms` with the actual repository URL if it differs.
+
+#### 9. Get and install the Payments app
+
+```bash
+bench get-app payments
+bench --site lms.localhost install-app payments
+```
+
+#### 10. Map the site to localhost and start the server
+
+```bash
+bench --site lms.localhost add-to-hosts
+bench start
+```
+
+Open [http://lms.localhost:8000](http://lms.localhost:8000) in your browser.  
+Default credentials: **Username:** `Administrator` | **Password:** *(the one you set in step 7)*
+
+---
+
+### Linux (Ubuntu / Debian)
+
+#### 1. Install system dependencies
+
+```bash
+sudo apt update && sudo apt upgrade -y
+sudo apt install -y \
+  python3-dev python3-pip python3-venv \
+  mariadb-server mariadb-client \
+  redis-server \
+  nodejs npm \
+  git curl \
+  libffi-dev libssl-dev \
+  wkhtmltopdf \
+  xvfb libfontconfig
+```
+
+Install yarn:
+
+```bash
+sudo npm install -g yarn
+```
+
+#### 2. Secure and configure MariaDB
+
+```bash
+sudo mysql_secure_installation
+```
+
+Edit the MariaDB server config:
+
+```bash
+sudo nano /etc/mysql/mariadb.conf.d/50-server.cnf
+```
+
+Add under `[mysqld]`:
+
+```ini
+[mysqld]
+character-set-client-handshake = FALSE
+character-set-server = utf8mb4
+collation-server = utf8mb4_unicode_ci
+```
+
+```bash
+sudo systemctl restart mariadb
+```
+
+#### 3. Install frappe-bench
+
+```bash
+pip3 install frappe-bench
+```
+
+Ensure `~/.local/bin` is on your PATH:
+
+```bash
+echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.bashrc
+source ~/.bashrc
+```
+
+#### 4. Initialise a bench
+
+```bash
+bench init --frappe-branch version-15 frappe-bench
+cd frappe-bench
+```
+
+#### 5. Create a new site
+
+```bash
+bench new-site lms.localhost
+```
+
+Enter your MariaDB root password when prompted, then set an Administrator password for the site.
+
+#### 6. Get and install the LMS app
+
+```bash
+bench get-app https://github.com/your-org/lms
+bench --site lms.localhost install-app lms
+```
+
+#### 7. Get and install the Payments app
+
+```bash
+bench get-app payments
+bench --site lms.localhost install-app payments
+```
+
+#### 8. Start the development server
+
+```bash
+bench --site lms.localhost add-to-hosts
+bench start
+```
+
+Open [http://lms.localhost:8000](http://lms.localhost:8000) in your browser.
+
+---
+
+## Troubleshooting
+
+**`bench` command not found**  
+Add `~/.local/bin` to PATH (see the PATH export step above).
+
+**MariaDB access denied**  
+Make sure you ran `mysql_secure_installation` and are supplying the correct root password.
+
+**Node/yarn version mismatch**  
+Use [nvm](https://github.com/nvm-sh/nvm) to manage Node versions: `nvm install 18 && nvm use 18`.
+
+**wkhtmltopdf PDF errors on WSL**  
+Install the version with patched Qt from the [wkhtmltopdf releases page](https://github.com/wkhtmltopdf/packaging/releases).
+
+---
+
+## Under the Hood
+
+- [**Frappe Framework**](https://github.com/frappe/frappe): A full-stack web application framework.
+- [**Frappe UI**](https://github.com/frappe/frappe-ui): A Vue-based UI library for modern interfaces.
+- [**Payments App**](https://github.com/frappe/payments): Handles payment gateway integrations for course enrollments.
+
+---
+
 <br>
 <div align="center" style="padding-top: 0.75rem;">
 	<a href="https://frappe.io" target="_blank">
