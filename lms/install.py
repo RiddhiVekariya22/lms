@@ -8,12 +8,14 @@ def after_install():
 	give_discussions_permission()
 	give_user_list_permission()
 	give_event_permission()
+	give_uni_admin_user_permission()
 
 
 def after_sync():
 	create_lms_roles()
 	set_default_certificate_print_format()
 	give_lms_roles_to_admin()
+	give_uni_admin_user_permission()
 
 
 def before_uninstall():
@@ -26,6 +28,7 @@ def create_lms_roles():
 	create_moderator_role()
 	create_evaluator_role()
 	create_lms_student_role()
+	create_uni_admin_role()
 
 
 def create_course_creator_role():
@@ -81,6 +84,21 @@ def create_lms_student_role():
 		role.update(
 			{
 				"role_name": "LMS Student",
+				"home_page": "",
+				"desk_access": 0,
+			}
+		)
+		role.save()
+
+
+def create_uni_admin_role():
+	if frappe.db.exists("Role", "Uni Admin"):
+		frappe.db.set_value("Role", "Uni Admin", "desk_access", 0)
+	else:
+		role = frappe.new_doc("Role")
+		role.update(
+			{
+				"role_name": "Uni Admin",
 				"home_page": "",
 				"desk_access": 0,
 			}
@@ -170,7 +188,7 @@ def create_batch_source():
 
 
 def give_lms_roles_to_admin():
-	roles = ["Course Creator", "Moderator", "Batch Evaluator"]
+	roles = ["Course Creator", "Moderator", "Batch Evaluator", "Uni Admin"]
 	for role in roles:
 		if not frappe.db.exists("Has Role", {"parent": "Administrator", "role": role}):
 			doc = frappe.new_doc("Has Role")
@@ -185,9 +203,31 @@ def give_user_list_permission():
 	doctype = "User"
 	roles = ["Course Creator", "Moderator", "Batch Evaluator"]
 	for role in roles:
-		permlevel = 0
-		create_role(doctype, role, permlevel)
+		create_role(doctype, role, 0)
 	create_role(doctype, "System Manager", 1)
+	give_uni_admin_user_permission()
+
+
+def give_uni_admin_user_permission():
+	existing = frappe.db.get_value(
+		"Custom DocPerm", {"parent": "User", "role": "Uni Admin", "permlevel": 0}, "name"
+	)
+	if existing:
+		frappe.db.set_value("Custom DocPerm", existing, {"read": 1, "select": 1, "write": 1, "create": 1})
+	else:
+		doc = frappe.new_doc("Custom DocPerm")
+		doc.update(
+			{
+				"parent": "User",
+				"role": "Uni Admin",
+				"permlevel": 0,
+				"read": 1,
+				"select": 1,
+				"write": 1,
+				"create": 1,
+			}
+		)
+		doc.save()
 
 
 def give_event_permission():
@@ -223,7 +263,7 @@ def create_role(doctype, role, permlevel, write=0, create=0):
 
 
 def delete_lms_roles():
-	roles = ["Course Creator", "Moderator", "Batch Evaluator", "LMS Student"]
+	roles = ["Course Creator", "Moderator", "Batch Evaluator", "LMS Student", "Uni Admin"]
 	for role in roles:
 		if frappe.db.exists("Role", role):
 			frappe.db.delete("Role", role)

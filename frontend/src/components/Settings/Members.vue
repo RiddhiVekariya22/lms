@@ -169,6 +169,7 @@ const getRole = (role: string) => {
 		'Course Creator': 'Instructor',
 		Moderator: 'Moderator',
 		'Batch Evaluator': 'Evaluator',
+		'Uni Admin': 'Uni Admin',
 	}
 	return map[role]
 }

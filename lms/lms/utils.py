@@ -32,7 +32,7 @@ from lms.lms.doctype.lms_enrollment.lms_enrollment import update_program_progres
 from lms.lms.md import find_macros
 
 RE_SLUG_NOTALLOWED = re.compile("[^a-z0-9]+")
-LMS_ROLES = ["Moderator", "Course Creator", "Batch Evaluator", "LMS Student"]
+LMS_ROLES = ["Moderator", "Course Creator", "Batch Evaluator", "LMS Student", "Uni Admin"]
 
 
 def get_lms_path():
@@ -399,6 +399,14 @@ def has_student_role(member: str = None):
 	return frappe.db.get_value(
 		"Has Role",
 		{"parent": member or frappe.session.user, "role": "LMS Student"},
+		"name",
+	)
+
+
+def has_uni_admin_role(member: str = None):
+	return frappe.db.get_value(
+		"Has Role",
+		{"parent": member or frappe.session.user, "role": "Uni Admin"},
 		"name",
 	)
 
@@ -1722,7 +1730,12 @@ def get_discussion_replies(topic: str):
 
 @frappe.whitelist()
 def get_order_summary(doctype: str, docname: str, coupon: str | None = None, country: str | None = None):
-	details = get_paid_course_details(docname) if doctype == "LMS Course" else get_paid_batch_details(docname)
+	if doctype == "LMS Course":
+		details = get_paid_course_details(docname)
+	elif doctype == "LMS Bulk Enrollment":
+		details = get_bulk_enrollment_details(docname)
+	else:
+		details = get_paid_batch_details(docname)
 
 	details.amount, details.currency = check_multicurrency(
 		details.amount, details.currency, country, details.amount_usd
@@ -1760,6 +1773,22 @@ def get_paid_course_details(docname: str) -> dict:
 		raise frappe.throw(_("This course is free."))
 
 	return details
+
+
+def get_bulk_enrollment_details(docname: str) -> frappe._dict:
+	doc = frappe.db.get_value(
+		"LMS Bulk Enrollment",
+		docname,
+		["document_name", "total_amount", "currency"],
+		as_dict=True,
+	)
+	return frappe._dict({
+		"title": doc.document_name,
+		"name": docname,
+		"amount": doc.total_amount or 0,
+		"currency": doc.currency or "USD",
+		"amount_usd": 0,
+	})
 
 
 def get_paid_batch_details(docname: str) -> dict:
@@ -1894,6 +1923,7 @@ def get_roles(name: str) -> dict:
 		"course_creator": has_course_instructor_role(name),
 		"batch_evaluator": has_evaluator_role(name),
 		"lms_student": has_student_role(name),
+		"uni_admin": has_uni_admin_role(name),
 	}
 
 
@@ -1918,10 +1948,82 @@ def complete_enrollment(payment_name: str, doctype: str, docname: str):
 
 	if payment_doc.payment_for_certificate:
 		update_certificate_purchase(docname, payment_name)
+	elif doctype == "LMS Bulk Enrollment":
+		complete_bulk_enrollment(docname, payment_name)
 	elif doctype == "LMS Course":
 		enroll_in_course(docname, payment_name)
 	else:
 		enroll_in_batch(docname, payment_name)
+
+
+def complete_bulk_enrollment(bulk_name: str, payment_name: str):
+	from frappe.utils.password import update_password
+
+	bulk = frappe.get_doc("LMS Bulk Enrollment", bulk_name)
+	bulk.status = "Paid"
+
+	for student in bulk.students:
+		try:
+			existing = frappe.db.exists("User", student.email)
+			user = create_user(student.email, student.first_name, student.last_name)
+			if not existing:
+				update_password(user.name, "Welcome@123")
+			if not frappe.db.exists("Has Role", {"parent": user.name, "role": "LMS Student", "parenttype": "User"}):
+				frappe.new_doc("Has Role").update({
+					"parent": user.name,
+					"parenttype": "User",
+					"parentfield": "roles",
+					"role": "LMS Student",
+				}).insert(ignore_permissions=True)
+
+			student_payment = frappe.new_doc("LMS Payment")
+			student_payment.update(
+				{
+					"member": user.name,
+					"billing_name": f"{student.first_name} {student.last_name or ''}".strip(),
+					"amount": bulk.unit_price or 0,
+					"currency": bulk.currency,
+					"payment_for_document_type": bulk.enroll_type,
+					"payment_for_document": bulk.document_name,
+					"payment_received": 1,
+				}
+			)
+			student_payment.save(ignore_permissions=True)
+
+			if bulk.enroll_type == "LMS Course":
+				if not frappe.db.exists("LMS Enrollment", {"member": user.name, "course": bulk.document_name}):
+					enrollment = frappe.new_doc("LMS Enrollment")
+					enrollment.update(
+						{
+							"member": user.name,
+							"course": bulk.document_name,
+							"payment": student_payment.name,
+						}
+					)
+					enrollment.save(ignore_permissions=True)
+					student.enrollment = enrollment.name
+			else:
+				if not frappe.db.exists("LMS Batch Enrollment", {"member": user.name, "batch": bulk.document_name}):
+					enrollment = frappe.new_doc("LMS Batch Enrollment")
+					enrollment.update(
+						{
+							"member": user.name,
+							"batch": bulk.document_name,
+							"payment": student_payment.name,
+						}
+					)
+					enrollment.save(ignore_permissions=True)
+					student.enrollment = enrollment.name
+
+			student.user = user.name
+			student.status = "Enrolled"
+		except Exception:
+			student.status = "Failed"
+			frappe.log_error(frappe.get_traceback(), f"Bulk enrollment failed for {student.email}")
+
+	enrolled_count = sum(1 for s in bulk.students if s.status == "Enrolled")
+	bulk.status = "Enrolled" if enrolled_count > 0 else "Draft"
+	bulk.save(ignore_permissions=True)
 
 
 def get_integration_requests(doctype: str, docname: str):

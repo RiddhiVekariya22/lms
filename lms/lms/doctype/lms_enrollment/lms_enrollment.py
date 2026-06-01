@@ -80,7 +80,7 @@ class LMSEnrollment(Document):
 
 def is_admin():
 	roles = frappe.get_roles(frappe.session.user)
-	admin_roles = ["Moderator", "Course Creator", "Batch Evaluator"]
+	admin_roles = ["Moderator", "Course Creator", "Batch Evaluator", "Uni Admin"]
 	for role in admin_roles:
 		if role in roles:
 			return True

@@ -34,6 +34,7 @@ def get_payment_link(
 ):
 	payment_gateway = get_payment_gateway()
 	address = frappe._dict(address)
+	billing_name = address.billing_name or frappe.db.get_value("User", frappe.session.user, "full_name")
 	redirect_to = get_redirect_url(doctype, docname, payment_for_certificate)
 
 	details = frappe._dict(get_order_summary(doctype, docname, coupon=coupon_code, country=country))
@@ -71,11 +72,11 @@ def get_payment_link(
 	payment_details = {
 		"amount": total_amount,
 		"title": f"Payment for {doctype} {title} {docname}",
-		"description": f"{address.billing_name}'s payment for {title}",
+		"description": f"{billing_name}'s payment for {title}",
 		"reference_doctype": doctype,
 		"reference_docname": docname,
 		"payer_email": frappe.session.user,
-		"payer_name": address.billing_name,
+		"payer_name": billing_name,
 		"currency": currency,
 		"payment_gateway": payment_gateway,
 		"redirect_to": redirect_to,
@@ -118,13 +119,14 @@ def record_payment(
 	coupon: str | None = None,
 ):
 	address = frappe._dict(address)
-	address_name = save_address(address)
+	address_name = save_address(address) if doctype != "LMS Bulk Enrollment" else None
+	billing_name = address.billing_name or frappe.db.get_value("User", frappe.session.user, "full_name")
 
 	payment_doc = frappe.new_doc("LMS Payment")
 	payment_doc.update(
 		{
 			"member": frappe.session.user,
-			"billing_name": address.billing_name,
+			"billing_name": billing_name,
 			"address": address_name,
 			"amount": amount,
 			"currency": currency,
@@ -156,6 +158,8 @@ def record_payment(
 def get_redirect_url(doctype: str, docname: str, payment_for_certificate: int) -> str:
 	if int(payment_for_certificate):
 		return get_lms_route(f"courses/{docname}/certification")
+	elif doctype == "LMS Bulk Enrollment":
+		return get_lms_route("bulk-enroll")
 	elif doctype == "LMS Course":
 		return get_lms_route(f"courses/{docname}")
 	else:

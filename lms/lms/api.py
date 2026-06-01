@@ -62,7 +62,8 @@ def get_user_info():
 	user.is_instructor = "Course Creator" in user.roles
 	user.is_moderator = "Moderator" in user.roles
 	user.is_evaluator = "Batch Evaluator" in user.roles
-	user.is_student = not user.is_instructor and not user.is_moderator and not user.is_evaluator
+	user.is_uni_admin = "Uni Admin" in user.roles
+	user.is_student = not user.is_instructor and not user.is_moderator and not user.is_evaluator and not user.is_uni_admin
 	user.is_fc_site = is_fc_site()
 	user.is_system_manager = "System Manager" in user.roles
 	user.sitename = frappe.local.site
@@ -2384,3 +2385,68 @@ def export_course_as_zip(course_name: str):
 def import_course_from_zip(zip_file_path: str):
 	frappe.only_for(["Moderator", "Course Creator"])
 	return import_course_zip(zip_file_path)
+
+
+@frappe.whitelist()
+def create_bulk_enrollment(students_csv: str, enroll_type: str, document_name: str):
+	frappe.only_for("Uni Admin")
+
+	rows = _parse_bulk_csv(students_csv)
+	unit_price, currency = _get_document_price(enroll_type, document_name)
+
+	bulk = frappe.new_doc("LMS Bulk Enrollment")
+	bulk.update(
+		{
+			"paid_by": frappe.session.user,
+			"enroll_type": enroll_type,
+			"document_name": document_name,
+			"unit_price": unit_price,
+			"currency": currency,
+			"total_amount": unit_price * len(rows),
+			"status": "Draft",
+		}
+	)
+	for row in rows:
+		bulk.append(
+			"students",
+			{
+				"email": row["email"],
+				"first_name": row["first_name"],
+				"last_name": row.get("last_name", ""),
+				"status": "Pending",
+			},
+		)
+	bulk.save(ignore_permissions=True)
+
+	if not unit_price:
+		from lms.lms.utils import complete_bulk_enrollment
+
+		complete_bulk_enrollment(bulk.name, None)
+		return {"name": bulk.name, "free": True}
+
+	return {"name": bulk.name, "unit_price": unit_price, "currency": currency, "total_amount": bulk.total_amount}
+
+
+def _parse_bulk_csv(csv_string: str) -> list:
+	import csv
+	import io
+
+	reader = csv.DictReader(io.StringIO(csv_string.strip()))
+	rows = []
+	for i, row in enumerate(reader, start=2):
+		row = {k.strip(): v.strip() for k, v in row.items()}
+		missing = [f for f in ("email", "first_name") if not row.get(f)]
+		if missing:
+			frappe.throw(f"Row {i}: missing required fields: {', '.join(missing)}")
+		rows.append(row)
+	if not rows:
+		frappe.throw("CSV has no student rows")
+	return rows
+
+
+def _get_document_price(enroll_type: str, document_name: str) -> tuple:
+	if enroll_type == "LMS Course":
+		price, currency = frappe.db.get_value("LMS Course", document_name, ["course_price", "currency"])
+	else:
+		price, currency = frappe.db.get_value("LMS Batch", document_name, ["amount", "currency"])
+	return price or 0, currency or "USD"

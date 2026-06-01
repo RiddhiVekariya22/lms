@@ -43,6 +43,13 @@
 				v-model="moderator"
 				@update:modelValue="saveRole('moderator')"
 			/>
+			<Switch
+				size="sm"
+				:label="__('Uni Admin')"
+				:description="__('Upload and enroll students in bulk for courses and batches')"
+				v-model="uni_admin"
+				@update:modelValue="saveRole('uni_admin')"
+			/>
 		</div>
 	</div>
 </template>
@@ -56,6 +63,7 @@ const moderator = ref(false)
 const course_creator = ref(false)
 const batch_evaluator = ref(false)
 const lms_student = ref(false)
+const uni_admin = ref(false)
 const readOnlyMode = window.read_only_mode
 
 const props = defineProps({
@@ -78,6 +86,7 @@ const roles = createResource({
 			'course_creator',
 			'batch_evaluator',
 			'lms_student',
+			'uni_admin',
 		]
 		for (let role of roles) {
 			if (data[role]) eval(role).value = true

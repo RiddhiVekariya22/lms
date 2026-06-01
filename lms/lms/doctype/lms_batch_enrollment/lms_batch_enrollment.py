@@ -27,7 +27,7 @@ class LMSBatchEnrollment(Document):
 			return
 
 		roles = frappe.get_roles()
-		if "Moderator" not in roles and "Batch Evaluator" not in roles:
+		if "Moderator" not in roles and "Batch Evaluator" not in roles and "Uni Admin" not in roles:
 			frappe.throw(_("You must be a Moderator or Batch Evaluator to enroll users in a batch."))
 
 	def validate_payment(self):
@@ -58,7 +58,7 @@ class LMSBatchEnrollment(Document):
 
 	def is_admin(self):
 		roles = frappe.get_roles(frappe.session.user)
-		return "Course Creator" in roles or "Moderator" in roles or "Batch Evaluator" in roles
+		return "Course Creator" in roles or "Moderator" in roles or "Batch Evaluator" in roles or "Uni Admin" in roles
 
 	def validate_duplicate_members(self):
 		if frappe.db.exists(

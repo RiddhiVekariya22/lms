@@ -84,6 +84,7 @@ import {
 	LogOut,
 	Moon,
 	User,
+	Users,
 	Settings,
 	Sun,
 	Trash2,
@@ -131,6 +132,16 @@ const userDropdownOptions = computed(() => {
 					},
 					condition: () => {
 						return isLoggedIn
+					},
+				},
+				{
+					icon: Users,
+					label: 'Bulk Enroll',
+					onClick: () => {
+						router.push('/bulk-enroll')
+					},
+					condition: () => {
+						return userResource.data?.is_uni_admin
 					},
 				},
 				{

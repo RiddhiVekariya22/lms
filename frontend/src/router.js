@@ -228,6 +228,11 @@ const routes = [
 		component: () => import('@/pages/DataImport.vue'),
 		props: true,
 	},
+	{
+		path: '/bulk-enroll',
+		name: 'BulkEnroll',
+		component: () => import('@/pages/BulkEnroll.vue'),
+	},
 ]
 
 let router = createRouter({
